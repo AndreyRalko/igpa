@@ -1,0 +1,205 @@
+Не сформированные потоки
+
+select CcafedraNameRU,SBsubjectNameRU from tb_potoks AS p1,tb_potok_query ,tb_subjects ,tb_cafedras 
+  WHERE p1.Ptemp=3  AND p1.Pid=PQpid AND p1.PisMain=1 AND p1.Pid not IN (select p2.PoriginalPid from tb_potoks AS p2 WHERE p2.Ptemp=4)
+  AND p1.PsubjectID=SBsubjectID AND tb_cafedras.CcafedraID=SBcafedraID AND SBispractice=0
+  GROUP BY CcafedraNameRU,p1.Pid
+
+select FfacultyNameRU,CcafedraNameRU,SBsubjectNameRU,p1.Pcourse from tb_potoks AS p1,tb_potok_query ,tb_subjects ,tb_cafedras ,tb_faculties
+  WHERE p1.Ptemp=3  AND p1.Pid=PQpid AND p1.PisMain=1 AND p1.Pid not IN (select p2.PoriginalPid from tb_potoks AS p2 WHERE p2.Ptemp=4)
+  AND p1.PsubjectID=SBsubjectID AND tb_cafedras.CcafedraID=SBcafedraID AND SBispractice=0 and CfacultyID=FfacultyID
+  GROUP BY CcafedraNameRU,p1.Pid
+  order by FfacultyNameRU,CcafedraNameRU,SBsubjectNameRU,Pcourse
+
+
+---------------------------------
+
+Кол-во студентов больше чем предполагают потоки
+select 
+  p1.Pid,p2.Pid,count(DISTINCT PQqueryID),count(DISTINCT p2.Pid),p2.Pcount,p2.Pmax,p1.PisMain,p1.Ptype,SBsubjectNameRU,CcafedraNameRU
+  FROM tb_potoks AS p1,tb_potoks AS p2, tb_potok_query  ,tb_subjects ,tb_cafedras 
+  WHERE p1.Pid=p2.PoriginalPid AND p1.Pid=PQpid  AND p1.PsubjectID=SBsubjectID AND SBcafedraID=CcafedraID
+   
+  GROUP BY p1.Pid
+  HAVING (count(DISTINCT p2.Pid)*p2.Pcount)<count(DISTINCT PQqueryID)
+  ORDER BY CcafedraNameRU,SBsubjectNameRU
+
+select 
+  p1.Pid,p2.Pid,count(DISTINCT PQqueryID),count(DISTINCT p2.Pid),p2.Pcount,p2.Pmax,p1.PisMain,p1.Ptype,SBsubjectNameRU,CcafedraNameRU
+  FROM tb_potoks AS p1,tb_potoks AS p2, tb_potok_query  ,tb_subjects ,tb_cafedras 
+  WHERE p1.Pid=p2.PoriginalPid AND p1.Pid=PQpid  AND p1.PsubjectID=SBsubjectID AND SBcafedraID=CcafedraID
+   and p2.Pmax>0 and p1.Ptype<>1000
+  GROUP BY p1.Pid
+  HAVING (count(DISTINCT p2.Pid)*p2.Pcount)<count(DISTINCT PQqueryID)
+  ORDER BY CcafedraNameRU,SBsubjectNameRU
+
+-----------------------
+несовпадающие часы потоки и заявки
+select * FROM tb_potoks ,tb_potok_query,tb_queries,tb_tupsubjects ,tb_subjectgrouptype ,tb_students,tb_groups ,tb_totalmarks
+  WHERE PQpid=Pid AND QqueryID=PQqueryID AND QtupsubjectID=TStupSubjectID AND TStupSubjectID=SGTtupsubjectid
+  AND SGTgrouptypeid=Ptype AND Phours<>SGThours AND STstudentID=QstudentID AND STgroupID=GgroupID AND STstudentID=TMstudentID
+  AND QqueryID=TMqueryID AND TMiscurrent=1
+
+
+//---------Старые заявки-----------
+
+SELECT 
+  students.StudentID,lastname,firstname,groups.name,SubjectNameRU
+  FROM students,queries,totalmarks,studygroups,tupsubjects,groups,subjects
+  WHERE groups.groupID=students.groupID AND queries.StudentID=students.StudentID AND students.StudentID=totalmarks.studentID
+  AND queries.QueryID=totalmarks.queryID AND studygroups.StudyGroupID=totalmarks.studygroupID
+  AND iscurrent=1 AND tupSubjectID=queries.SubjectID AND CurriculumID<>TypCurriculumID AND studygroups.year=2019 
+  AND isStudent=1 AND subjects.SubjectID=tupsubjects.SubjectID
+  ORDER BY NAME,lastname,firstname
+//--------------------
+
+неправильные оригинальные потоки
+SELECT pq2.PQid
+  FROM tb_potoks AS p1,tb_potoks AS p2,tb_potok_query AS pq1,tb_potok_query AS pq2
+  WHERE p1.Ptemp=3 AND p2.Ptemp=4 AND pq1.PQpid=p1.Pid AND pq2.PQpid=p2.Pid
+  AND pq2.PQqueryID=pq1.PQqueryID AND p1.Ptype=p2.Ptype AND p2.PoriginalPid<>p1.Pid
+
+
+SELECT pq1.PQid,pq2.PQid,p1.Pid,p2.Pid,CcafedraNameRU,SBsubjectNameRU,p1.Pcourse,pq1.PQqueryID,Gname,p2.PmainPid
+  FROM tb_potoks AS p1,tb_potoks AS p2,tb_potok_query AS pq1,tb_potok_query AS pq2,tb_subjects ,tb_cafedras,tb_queries,tb_students ,tb_groups  
+  WHERE p1.Ptemp=3 AND p2.Ptemp=3 AND pq1.PQpid=p1.Pid AND pq2.PQpid=p2.Pid
+  AND pq2.PQqueryID=pq1.PQqueryID AND p1.PisMain=1 AND p2.PisMain=0  AND p2.PmainPid<>p1.Pid
+  AND p1.PsubjectID=SBsubjectID AND CcafedraID=SBcafedraID AND STstudentID=QstudentID AND pq1.PQqueryID=QqueryID AND STgroupID=GgroupID
+
+
+//---------кол-во выделенных мест в потоках ниже чем необходимо
+select sum(p1.Pmax) as sumPmax, (select count(distinct PQqueryID) from tb_potok_query where PQpid=p1.PoriginalPid ) as countQueryID,p1.PoriginalPid,
+  trim(GROUP_CONCAT(" ",Pid,"(",Pmax,")")),SBsubjectNameRU,CcafedraNameRU 
+ 
+  from tb_potoks as p1,tb_subjects,tb_cafedras
+  where p1.Ptemp=4 and p1.PsubjectID=SBsubjectID and SBcafedraID=CcafedraID
+  group by p1.PoriginalPid
+  having sumPmax<countQueryID
+
+
+select sum(p1.Pmax) as sumPmax, (select count(distinct PQqueryID) from tb_potok_query where PQpid=p1.PoriginalPid ) as countQueryID,p1.PoriginalPid,
+  /*trim(GROUP_CONCAT(" ",Pid,"(",Pmax,")")),*/trim(GROUP_CONCAT(" ",Pid,"(",Pmax,")")),SBsubjectNameRU,CcafedraNameRU ,p1.Pcourse
+ 
+  from tb_potoks as p1,tb_subjects,tb_cafedras
+  where p1.Ptemp=4 and p1.PsubjectID=SBsubjectID and SBcafedraID=CcafedraID
+  group by p1.PoriginalPid
+  having sumPmax<countQueryID and count(Pid)=1
+
+
+select sum(p1.Pmax) as sumPmax,
+  (select count(distinct PQqueryID) from tb_potok_query,tb_students,tb_queries where PQpid=p1.PoriginalPid and PQqueryID=QqueryID and QstudentID=STstudentID) as countQueryID,
+  p1.PoriginalPid,Ptype,
+   trim(GROUP_CONCAT(" ",Pid)), trim(GROUP_CONCAT(" ",Pid,"(",Pmax,")")),p1.Pcourse,SBsubjectNameRU,CcafedraNameRU 
+ 
+  from tb_potoks as p1,tb_subjects,tb_cafedras
+  where p1.Ptemp=4 and p1.PsubjectID=SBsubjectID and SBcafedraID=CcafedraID
+  group by p1.PoriginalPid
+  having sumPmax<countQueryID 
+  order by p1.Pcourse,CfacultyID,CcafedraNameRU,SBsubjectNameRU
+
+//-------------------------------------------
+
+
+//----------не совпадения с одной группы в разные потоки
+
+select 
+  distinct p1.Pid,p1.Pterm,p2.Pid,p2.Pterm,SBsubjectNameRU,CcafedraNameRU,tb_groups.Gname
+  from tb_potoks as p1,tb_potoks as p2,tb_potok_query as pq1,tb_potok_query as pq2,tb_students as st1,tb_students as st2,tb_queries as q1,tb_queries as q2,tb_groups,
+  tb_subjects,tb_cafedras
+  where p1.Ptemp=3 and p2.Ptemp=3 and p1.Pid=pq1.PQpid and p2.Pid=pq2.PQpid and p1.PsubjectID=p2.PsubjectID
+  and p1.Pid<p2.Pid and pq1.PQqueryID=q1.QqueryID and pq2.PQqueryID=q2.QqueryID and q1.QstudentID=st1.STstudentID
+  and q2.QstudentID=st2.STstudentID and st1.STgroupID=st2.STgroupID and q1.QtupsubjectID=q2.QtupsubjectID
+  and GgroupID=st1.STgroupID and p1.PsubjectID=SBsubjectID and SBcafedraID=CcafedraID and p1.PisMain=1 and p2.PisMain=1
+  and p1.PcontrolFormID<>1000 and p1.Ptype<>1000 and p1.Pterm=p2.Pterm
+  
+//-------------заявки на разных языках с одной группы
+select 
+  tb_groups.Gname
+  from tb_queries as q1,tb_queries as q2,tb_students as st1,tb_students as st2,tb_groups where 
+  q1.QstudentID=st1.STstudentID and q2.QstudentID=st2.STstudentID and st1.STgroupID=st2.STgroupID and q1.Qlang<>q2.Qlang
+  and GgroupID=st1.STgroupID and q1.QtupsubjectID=q2.QtupsubjectID
+  GROUP by GgroupID
+ВОУД 
+
+
+
+//------------------Привязаны к потокам4 не оригинальных потоков3--- сначала записались затем переформировали поток
+select pq2.PQid from tb_potok_query as pq1,tb_potoks as p1,tb_potok_query as pq2,tb_potoks as p2,tb_subjects
+  where 
+  p1.Ptemp=3 and p2.Ptemp=4 and pq1.PQpid=p1.Pid and pq2.PQpid=p2.Pid and pq1.PQqueryID=pq2.PQqueryID and p1.Pid<>p2.PoriginalPid
+  and p1.Ptype=p2.Ptype and SBsubjectID=p1.PsubjectID
+//-----------------------------------------------------
+
+
+//-----------------ПОТОКИ ГИГАНТЫ которые нужно переформировать
+select PoriginalPid,GROUP_CONCAT(distinct Pid),count(DISTINCT PQqueryID),SBsubjectNameRU,CcafedraNameRU from tb_potoks,tb_potok_query,tb_subjects,tb_cafedras where Pterm=1 and PQpid=PoriginalPid and PsubjectID=SBsubjectID and SBcafedraID=CcafedraID
+    group by PoriginalPid
+
+  HAVING count(DISTINCT PQqueryID)>120 and count(distinct Pid)=1
+  order by CcafedraNameRU
+
+
+//----------------Потоки без подпотоков в которых должны быть подпотоки
+select * from tb_potoks as p1 where p1.Ptemp=3
+  and
+  p1.Pid in (select PQpid from tb_potok_query,tb_queries,tb_students where PQqueryID=QqueryID and QstudentID=STstudentID) and Pid not in (select p2.PoriginalPid from tb_potoks as p2 where p2.Ptemp=4)
+  and p1.Ptype in (1,2,3) and p1.Pform=1
+
+
+select * from tb_potoks as p1 
+        where p1.Ptemp=3  and  
+        p1.Pid in (select PQpid from tb_potok_query,tb_queries,tb_students 
+        where PQqueryID=QqueryID and QstudentID=STstudentID) and 
+        Pid not in (select p2.PoriginalPid from tb_potoks as p2 where p2.Ptemp=4) and
+        PmainPid in (select p3.PoriginalPid from tb_potoks as p3)
+        and p1.Ptype in (1,2,3) and p1.PisMain=0
+
+//------------------подпотоки оригинального потока к подпотоками без заявок------------
+
+select p1.*,count(distinct PQqueryID),p2.Pid ,SBsubjectNameRU,CcafedraNameRU
+  from tb_potoks as p1 
+  left OUTER join tb_subjects on (p1.PsubjectID=SBsubjectID)
+  left OUTER join tb_cafedras on (SBcafedraID=CcafedraID)
+  left outer join tb_potok_query on (PQpid=p1.Pid)
+  left outer join tb_potoks as p2 on (p2.PoriginalPid=p1.Pid)
+  where p1.PmainPid=563 
+  group by p1.Pid
+  order by p1.Pid
+
+//--------------ПОТОКИ без преподов
+select 
+  Pid,CcafedraNameRU,SBsubjectNameRU,GTshortnameru,GROUP_CONCAT(distinct gname),Phours
+  from tb_potoks,tb_potok_query,tb_queries,tb_students,tb_subjects,tb_groups,tb_cafedras,tb_grouptypes
+  where Pterm=1 and Ptemp=4 and PoriginalPid=PQpid and PQqueryID=QqueryID and QstudentID=STstudentID and 
+  STgroupID=GgroupID and PsubjectID=SBsubjectID and SBcafedraID=CcafedraID and Ptype=GTgrouptypeID
+  and Pid not in (select PPpid from tb_prep_pot) and Ptype<>1000 and STstudyFormID in (1,3,4,6,7,8,11,12,13,16,17,18,19,21,22,23,24)
+  group by Pid
+  order by CcafedraNameRU,SBsubjectNameRU
+
+//------------ПОТОКИ которые не поставили в расписание
+select 
+  Pid,CcafedraNameRU,SBsubjectNameRU,GTshortnameru,GROUP_CONCAT(distinct gname),Phours
+  from tb_potoks,tb_potok_query,tb_queries,tb_students,tb_subjects,tb_groups,tb_cafedras,tb_grouptypes,tb_prep_pot
+  where Pterm=1 and Ptemp=4 and PoriginalPid=PQpid and PQqueryID=QqueryID and QstudentID=STstudentID and PPpid=Pid and
+  STgroupID=GgroupID and PsubjectID=SBsubjectID and SBcafedraID=CcafedraID and Ptype=GTgrouptypeID and PPid not in (select TTppid from tb_timetables)
+   and Ptype<>1000 and STstudyFormID in (1,3,4,6,7,8,11,12,13,16,17,18,19,21,22,23,24)
+  
+  group by Pid
+  order by CcafedraNameRU,SBsubjectNameRU
+
+//------------заявки на чужие потоки
+
+select pq2.PQid from tb_potok_query as pq1,tb_potoks as p1,tb_potok_query as pq2,tb_potoks as p2,tb_subjects
+  where 
+  p1.Ptemp=3 and p2.Ptemp=4 and pq1.PQpid=p1.Pid and pq2.PQpid=p2.Pid and pq1.PQqueryID=pq2.PQqueryID and p1.Pid<>p2.PoriginalPid
+  and p1.Ptype=p2.Ptype and SBsubjectID=p1.PsubjectID
+
+гос экз Ист Казахстана
+
+сделать запрос на выявление записей в не существующие потоки
+
+проф ор ин яз изор82зк изок81зк  не делится на кафедры
+
+государственный архив акмол обл.  филиал каф отеч ист
+
+
